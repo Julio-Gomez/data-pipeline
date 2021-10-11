@@ -29,7 +29,7 @@ def generador_descarga_ubicacion_metrobus(chunksize=cnf.CHUNKSIZE_DEFAULT_RECORD
 
         total_records_consultados += len(records)
 
-        yield records
+        yield total, records
 
         if total_records_consultados == total:
             break
