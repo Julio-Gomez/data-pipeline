@@ -1,53 +1,47 @@
-import requests
-import json
-
-
-class ExceptionConsultaUbicacionMetrobus(Exception):
-    pass
+from .descarga_ubicacion_metrobus import generador_descarga_ubicacion_metrobus
+from .limite_alcadia import obtener_poligonos_alcaldias_desde_excel
+from .point_in_polygon import is_inside_sm
+from . import config as cnf
 
 
 class ObtencionUbicacionMetrobus:
     def __init__(self):
         pass
 
+    def ejecutar(self, chunksize=100):
+        rel_alcal_polig = self.obtener_poligonos_alcaldias_desde_excel()
+
+        for records_ubicacion in self.generador_consultar_ubicacion(chunksize):
+            for record in records_ubicacion:
+                latitud = record['position_latitude']
+                longitud = record['position_longitude']
+
+                alcaldias_encontrado = []
+                for alcaldia, poligono in rel_alcal_polig.items():
+                    estatus = is_inside_sm(poligono, (longitud, latitud))
+
+                    if estatus == 1:
+                        alcaldias_encontrado.append(alcaldia)
+                        break
+
+                    if estatus == 2:
+                        alcaldias_encontrado.append(alcaldia)
+
+                if not alcaldias_encontrado:
+                    alcaldias_encontrado.append(cnf.ALCALDIA_NO_ENCONTRADO)
+
+                record['alcaldia'] = '-'.join(alcaldias_encontrado)
+
+                print(record)
+
     @staticmethod
     def generador_consultar_ubicacion(chunksize=100):
-        url_root = 'https://datos.cdmx.gob.mx'
+        return generador_descarga_ubicacion_metrobus(chunksize=chunksize)
 
-        total_records_consultados = 0
+    @staticmethod
+    def obtener_poligonos_alcaldias_desde_excel():
+        return obtener_poligonos_alcaldias_desde_excel()
 
-        url = (
-                url_root +
-                f'/api/3/action/datastore_search?resource_id=ad360a0e-b42f-482c-af12-1fd72140032e&limit={chunksize}')
-
-        while True:
-            resp = requests.get(url)
-
-            if resp.status_code != 200:
-                raise ExceptionConsultaUbicacionMetrobus(
-                    f'La respuesta del URL {url} presenta estatus {resp.status_code}')
-
-            resp_content = json.loads(resp.text)
-
-            result = resp_content['result']
-            links = result['_links']
-
-            total = result['total']
-
-            records = result['records']
-
-            total_records_consultados += len(records)
-
-            yield records
-
-            if total_records_consultados == total:
-                break
-            else:
-                url = url_root + links['next']
-
-    def ejecutar(self, chunksize=100):
-        for records_ubicacion in self.generador_consultar_ubicacion(chunksize):
-            pass
-
-
-ObtencionUbicacionMetrobus().ejecutar()
+    @staticmethod
+    def coordenada_esta_dentrodel_poligono(poligono, coordenada):
+        return is_inside_sm(poligono, coordenada)
