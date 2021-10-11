@@ -63,11 +63,25 @@ class BD:
             cursor.execute(sql)
             self.con.commit()
         except sqlite3.Error as e:
-            print(e)
             self.con.rollback()
+            self.cerrar_cursor(cursor)
+
             raise e
 
         self.cerrar_cursor(cursor)
+
+    def select(self, sql, data=()):
+        cursor = self.abrircursor()
+
+        try:
+            cursor.execute(sql) if not data else cursor.execute(sql, data)
+            resp = cursor.fetchall()
+            self.cerrar_cursor(cursor)
+
+            return resp
+        except sqlite3.Error as e:
+            self.cerrar_cursor(cursor)
+            raise e
 
     @staticmethod
     def cerrar_cursor(cursor):
